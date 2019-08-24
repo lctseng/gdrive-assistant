@@ -5,6 +5,7 @@ require 'fileutils'
 
 class GdriveVerifyJob < ApplicationJob
   REDIS_FIELDS = %w[
+    id
     state
     download_count
     comment
@@ -44,7 +45,7 @@ class GdriveVerifyJob < ApplicationJob
   end
 
   def self.cache_downloaded_files?
-    false && Rails.env.development?
+    Rails.env.development?
   end
 
   def self.cleanup_on_error?
@@ -114,15 +115,29 @@ class GdriveVerifyJob < ApplicationJob
     src_folder_id = extract_folder_id_from_url(src_folder_url)
     dst_folder_id = extract_folder_id_from_url(dst_folder_url)
     id = SecureRandom.uuid
+    init_redis_record(id, src_folder_id, dst_folder_id)
     if perform_now
       new.perform(id, src_folder_id, dst_folder_id)
     else
       perform_async(id, src_folder_id, dst_folder_id)
     end
-    id
+    [true, id]
   rescue StandardError => e
-    Rails.logger.error("Failed to register job: #{e.message}")
-    nil
+    msg = "Failed to register job: #{e.message}"
+    Rails.logger.error(msg)
+    [false, msg]
+  end
+
+  def self.init_redis_record(id, src_folder_id, dst_folder_id)
+    rkey = redis_key(id)
+    redis.hset(rkey, 'id', id)
+    redis.hset(rkey, 'state', 'init')
+    redis.hset(rkey, 'download_count', 0)
+    redis.hset(rkey, 'comment', '')
+    redis.hset(rkey, 'diff_json', '[]')
+    redis.hset(rkey, 'src_folder_id', src_folder_id)
+    redis.hset(rkey, 'dst_folder_id', dst_folder_id)
+    redis.expire(rkey, 300)
   end
 
   def self.get_job_state(job_id)
@@ -157,16 +172,6 @@ class GdriveVerifyJob < ApplicationJob
     self.class.redis_key(@id)
   end
 
-  def init_redis_record
-    redis.hset(redis_key, 'state', 'init')
-    redis.hset(redis_key, 'download_count', 0)
-    redis.hset(redis_key, 'comment', '')
-    redis.hset(redis_key, 'diff_json', '[]')
-    redis.hset(redis_key, 'src_folder_id', @src_folder_id)
-    redis.hset(redis_key, 'dst_folder_id', @dst_folder_id)
-    reset_expire
-  end
-
   def download_folder(folder_id)
     self.class.sanity_check(folder_id)
     cache_folder = File.join(Rails.root, 'tmp', 'download_cache', folder_id)
@@ -188,7 +193,6 @@ class GdriveVerifyJob < ApplicationJob
     @id = id
     @src_folder_id = src_folder_id
     @dst_folder_id = dst_folder_id
-    init_redis_record
     Rails.logger.info('Downloading src folder')
     redis.hset(redis_key, 'state', 'download_src')
     @src_folder_path = download_folder(@src_folder_id)
@@ -217,20 +221,22 @@ class GdriveVerifyJob < ApplicationJob
       redis.hset(redis_key, 'state', 'failed')
       redis.hset(redis_key, 'diff_json', res.to_json)
     end
-    self.class.cleanup_path(@src_folder_path)
-    self.class.cleanup_path(@dst_folder_path)
+    unless self.class.cache_downloaded_files?
+      self.class.cleanup_path(@src_folder_path)
+      self.class.cleanup_path(@dst_folder_path)
+    end
   end
 
-  # Make sure all files in dst folder are presented in src folder
+  # Make sure all files in src folder are presented in dst folder
   def compare_folder_recursive(result, src_folder, dst_folder, current_path = '')
     Rails.logger.info "Comparing folder #{src_folder} <=> #{dst_folder}"
     if src_folder != dst_folder
-      Dir.foreach(dst_folder) do |item|
+      Dir.foreach(src_folder) do |item|
         next if (item == '.') || (item == '..')
 
         src_path = File.join(src_folder, item)
         dst_path = File.join(dst_folder, item)
-        if File.exist?(src_path) && File.file?(src_path) == File.file?(dst_path)
+        if File.exist?(dst_path) && File.file?(src_path) == File.file?(dst_path)
           if File.directory? dst_path
             # Recursive call
             compare_folder_recursive(result, src_path, dst_path, File.join(current_path, item))
