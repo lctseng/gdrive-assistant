@@ -2,6 +2,7 @@
 
 class Api::GdriveController < ApplicationController
   protect_from_forgery except: %i[verify]
+  before_action :authenticate_user!
 
   def verify
     res, data = GdriveVerifyJob.register(
