@@ -4,6 +4,12 @@ class Api::GdriveController < ApplicationController
   protect_from_forgery except: %i[verify]
   before_action :authenticate_user!
 
+  def ping
+    render json: {
+      success: GdriveVerifyJob.gdrive_ready?
+    }
+  end
+
   def verify
     res, data = GdriveVerifyJob.register(
       params[:src_folder_url].to_s,

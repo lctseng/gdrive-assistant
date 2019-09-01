@@ -16,7 +16,7 @@ class GdriveVerifyJob < ApplicationJob
     diff_json
   ].freeze
 
-  sidekiq_options retry: 0, dead: true
+  sidekiq_options retry: 0
   sidekiq_retries_exhausted do |msg, _ex|
     Rails.logger.warn "Failed #{msg['class']} with #{msg['args']}: #{msg['error_message']}"
     id = msg['args'][0]
@@ -65,10 +65,21 @@ class GdriveVerifyJob < ApplicationJob
     url
   end
 
+  def self.gdrive_global_options
+    ["-c #{File.join(Rails.root, 'config', 'gdrive')}"]
+  end
+
+  def self.gdrive_ready?
+    run_gdrive_command('list')
+  end
+
   def self.run_gdrive_command(*args, &block)
     exec_path = File.join(PLATFORM_BIN_PATH, 'gdrive')
-    puts ([exec_path] + args).join(' ')
-    Open3.popen3(([exec_path] + args).join(' ')) do |_stdin, stdout, stderr, wait_thr|
+    cmd_line = ([exec_path] + gdrive_global_options + args).join(' ')
+    Rails.logger.info cmd_line
+    res = false
+    Open3.popen3(cmd_line) do |_stdin, stdout, stderr, wait_thr|
+      _stdin.close
       loop do
         break if stdout.eof? || stderr.eof?
 
@@ -90,12 +101,14 @@ class GdriveVerifyJob < ApplicationJob
           Rails.logger.error line
         end
       end
-      if wait_thr.value.success?
+      res = wait_thr.value.success?
+      if res
         Rails.logger.info 'Download successfully'
       else
         Rails.logger.info 'Download failed'
       end
     end
+    res
   end
 
   def self.sanity_check(folder_id)
