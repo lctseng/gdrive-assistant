@@ -39,6 +39,7 @@ gem 'sidekiq'
 group :development do
   gem 'capistrano-rails'
   gem 'capistrano-rbenv'
+  gem 'capistrano-sidekiq'
   gem 'capistrano-upload-config'
   gem 'capistrano3-puma'
 end

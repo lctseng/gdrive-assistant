@@ -32,6 +32,7 @@
 
 # GDrive
 /config/gdrive/token_v2.json
+/config/gdrive/token_v2.production.json
 
 # Config
 /config/database.yml
