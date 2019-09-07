@@ -147,7 +147,7 @@ class GdriveVerifyJob < ApplicationJob
     redis.hset(rkey, 'state', 'init')
     redis.hset(rkey, 'download_count', 0)
     redis.hset(rkey, 'comment', '')
-    redis.hset(rkey, 'diff_json', '[]')
+    redis.hset(rkey, 'diff_json', '{}')
     redis.hset(rkey, 'src_folder_id', src_folder_id)
     redis.hset(rkey, 'dst_folder_id', dst_folder_id)
     redis.expire(rkey, 300)
@@ -219,7 +219,10 @@ class GdriveVerifyJob < ApplicationJob
   end
 
   def compare_folder
-    res = []
+    res = {
+      missing: [],
+      mismatch: []
+    }
     compare_folder_recursive(
       res,
       self.class.find_first_valid_folder(@src_folder_path),
@@ -230,7 +233,8 @@ class GdriveVerifyJob < ApplicationJob
       redis.hset(redis_key, 'state', 'success')
     else
       Rails.logger.error("Compare failed: #{@id}")
-      Rails.logger.error("List of missing files: #{res.inspect}")
+      Rails.logger.error("List of missing files: #{res[:missing].inspect}")
+      Rails.logger.error("List of mismatch files: #{res[:mismatch].inspect}")
       redis.hset(redis_key, 'state', 'failed')
       redis.hset(redis_key, 'diff_json', res.to_json)
     end
@@ -258,13 +262,13 @@ class GdriveVerifyJob < ApplicationJob
             unless FileUtils.compare_file(src_path, dst_path)
               filename = File.join(current_path, item)
               Rails.logger.error "File differ: #{filename}"
-              result << filename
+              result[:mismatch] << filename
             end
           end
         else
           filename = File.join(current_path, item)
           Rails.logger.error "File not found: #{filename}"
-          result << filename
+          result[:missing] << filename
         end
       end
     else
