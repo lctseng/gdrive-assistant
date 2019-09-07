@@ -228,7 +228,7 @@ class GdriveVerifyJob < ApplicationJob
       self.class.find_first_valid_folder(@src_folder_path),
       self.class.find_first_valid_folder(@dst_folder_path)
     )
-    if res.empty?
+    if res[:missing].empty? && res[:mismatch].empty?
       Rails.logger.info("Compare success: #{@id}")
       redis.hset(redis_key, 'state', 'success')
     else
