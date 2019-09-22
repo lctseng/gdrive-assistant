@@ -2,7 +2,7 @@
 
 class Api::GdriveController < ApplicationController
   protect_from_forgery except: %i[verify]
-  before_action :authenticate_user!
+  before_action :authenticate_user!, except: [:ping]
 
   def ping
     render json: {
