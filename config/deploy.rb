@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # config valid for current version and patch releases of Capistrano
-lock '~> 3.11.0'
+lock '~> 3.14.1'
 
 set :application, 'gdrive-assistant'
 set :repo_url, 'git@github.com:lctseng/gdrive-assistant.git'
