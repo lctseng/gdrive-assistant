@@ -6,11 +6,11 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 ruby '2.6.6'
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
-gem 'rails', '~> 5.2.3'
+gem 'rails', '~> 5.2'
 # Use pg as the database for Active Record
 gem 'pg'
 # Use Puma as the app server
-gem 'puma', '~> 3.11'
+gem 'puma', '~> 3.12'
 # Use SCSS for stylesheets
 gem 'sass-rails', '~> 5.0'
 # Use Uglifier as compressor for JavaScript assets
@@ -37,11 +37,11 @@ gem 'sidekiq'
 
 # Use Capistrano for deployment
 group :development do
+  gem 'capistrano3-puma'
   gem 'capistrano-rails'
   gem 'capistrano-rbenv'
   gem 'capistrano-sidekiq'
   gem 'capistrano-upload-config'
-  gem 'capistrano3-puma'
 end
 # Reduces boot times through caching; required in config/boot.rb
 gem 'bootsnap', '>= 1.1.0', require: false
