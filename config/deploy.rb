@@ -53,3 +53,13 @@ set :puma_env, fetch(:rack_env, fetch(:rails_env, 'production'))
 set :puma_worker_timeout, nil
 set :puma_init_active_record, true
 set :puma_preload_app, false
+
+# Monit
+set :puma_user, :app
+set :puma_monit_use_sudo, false
+set :puma_monit_bin, 'sudo /usr/bin/monit'
+
+set :sidekiq_user, :app
+set :sidekiq_monit_use_sudo, false
+set :monit_bin, 'sudo /usr/bin/monit'
+set :sidekiq_monit_conf_file, 'gdrive_assistant_sidekiq_monit.conf'
